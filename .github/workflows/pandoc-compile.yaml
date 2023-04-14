@@ -1,4 +1,4 @@
-name: Build LaTeX PDF document
+name: Build PDF Document
 on: push
 
 env:
@@ -9,7 +9,7 @@ env:
 
 jobs:
   convert_via_pandoc:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
     steps:
       - name: Set up Git repository
         uses: actions/checkout@v3
