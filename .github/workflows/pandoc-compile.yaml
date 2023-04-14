@@ -1,15 +1,58 @@
-name: Long Usage
-
+name: Build LaTeX PDF document
 on: push
+
+env:
+  INPUT_MD: "submission.md"
+  OUTPUT_TEX: "submission.tex"
+  OUTPUT_PDF_PDFLATEX: "submission.pdf"
+  OUTPUT_PDF: "1-checkpoint.pdf"
 
 jobs:
   convert_via_pandoc:
     runs-on: ubuntu-18.04
     steps:
-      - run: echo "foo" > input.txt  # create an example file
-      - uses: docker://pandoc/core:2.9
+      - name: Set up Git repository
+        uses: actions/checkout@v3
+      - name: Create PDF file
+        run: echo "foo" > main.txt
+      - name: Install pandoc template
+        run: |
+          wget https://github.com/Wandmalfarbe/pandoc-latex-template/releases/download/v2.3.0/Eisvogel-2.3.0.zip
+          unzip -d eisvogel Eisvogel-2.3.0.zip
+          mkdir -p ~/.pandoc/templates/
+          cp eisvogel/eisvogel.latex ~/.pandoc/templates/
+      - name: MD to TEX file
+        uses: docker://pandoc/core:2.9
         with:
-          args: >-  # allows you to break string into multiple lines
-            --standalone
-            --output=index.html
-            input.txt
+          args: >- # allows you to break string into multiple lines
+            -s
+            --template eisvogel/eisvogel.latex
+            --listings
+            -H disable_float.tex
+            -V colorlinks=true
+            -V linkcolor=blue
+            -V urlcolor=blue
+            --output=${{ env.OUTPUT_TEX }}
+            ${{ env.INPUT_MD }}
+      - name: TEX to PDF file
+        uses: xu-cheng/latex-action@v2
+        with:
+          root_file: ${{ env.OUTPUT_TEX }}
+          post_compile: "latexmk -c"
+      - name: Rename PDF file
+        run: mv ${{ env.OUTPUT_PDF_PDFLATEX }} ${{ env.OUTPUT_PDF }}
+      - name: Upload PDF file
+        uses: actions/upload-artifact@v3
+        with:
+          name: PDF
+          path: ${{ env.OUTPUT_PDF }}
+
+      # - name: Compile LaTeX document
+      #   uses: xu-cheng/latex-action@v2
+
+      # - run: echo "foo" > input.txt  # create an example file
+      #   with:
+      #     args: >-  # allows you to break string into multiple lines
+      #       --standalone
+      #       --output=index.html
+      #       input.txt
