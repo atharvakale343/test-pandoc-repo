@@ -5,7 +5,7 @@ env:
   INPUT_MD: "submission.md"
   OUTPUT_TEX: "submission.tex"
   OUTPUT_PDF_PDFLATEX: "submission.pdf"
-  OUTPUT_PDF: "1-checkpoint.pdf"
+  OUTPUT_PDF: "checkpoint.pdf"
   WRITEUPS_FOLDER: "writeups"
 
 jobs:
@@ -14,14 +14,31 @@ jobs:
     steps:
       - name: Set up Git repository
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Find matching workflow
+        uses: SamhammerAG/last-successful-build-action@v2
+        id: last-hash-step
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: "main"
+          workflow: "Build PDF Document"
+
+      - name: Log the last successful workflow SHA
+        run: echo "Last Build SHA = ${{ steps.last-hash-step.outputs.sha }}"
+
       - name: Check Writeup Diffs
         uses: tj-actions/changed-files@v35
         id: changed-files
         with:
+          sha: ${{ steps.last-hash-step.outputs.previous_sha }}
           dir_names: "true"
           dir_names_exclude_root: "true"
+          dir_names_max_depth: 2
           files: writeups
           json: true
+
       - name: List all changed files
         run: echo '**Changed Directories**<${{ steps.changed-files.outputs.all_changed_and_modified_files }}>'
       - name: Send output
@@ -29,8 +46,7 @@ jobs:
         run: echo "::set-output name=matrix::{\"container\":${{ steps.changed-files.outputs.all_changed_and_modified_files }}}"
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
-  
-  
+
   convert_via_pandoc:
     needs: [setup]
     runs-on: ubuntu-latest
@@ -61,18 +77,23 @@ jobs:
             -V colorlinks=true
             -V linkcolor=blue
             -V urlcolor=blue
-            --output=${{ env.WRITEUPS_FOLDER }}/${{ matrix.directory }}/${{ env.OUTPUT_TEX }}
-            ${{ env.WRITEUPS_FOLDER }}/${{ matrix.directory }}/${{ env.INPUT_MD }}
+            --output=${{ matrix.directory }}/${{ env.OUTPUT_TEX }}
+            ${{ matrix.directory }}/${{ env.INPUT_MD }}
       - name: TEX to PDF file
         uses: xu-cheng/latex-action@v2
         with:
-          work_in_root_file_dir: true
-          root_file: ${{ env.WRITEUPS_FOLDER }}/${{ matrix.directory }}/${{ env.OUTPUT_TEX }}
+          working_directory: ${{ matrix.directory }}
+          root_file: ${{ env.OUTPUT_TEX }}
           post_compile: "latexmk -c"
       - name: Rename PDF file
-        run: mv ${{ env.WRITEUPS_FOLDER }}/${{ matrix.directory }}/${{ env.OUTPUT_PDF_PDFLATEX }} ${{ env.WRITEUPS_FOLDER }}/${{ matrix.directory }}/${{ env.OUTPUT_PDF }}
-      - name: Upload PDF file
-        uses: actions/upload-artifact@v3
+        run: mv ${{ matrix.directory }}/${{ env.OUTPUT_PDF_PDFLATEX }} ${{ matrix.directory }}/${{ env.OUTPUT_PDF }}
+      - name: Remove generated TEX file
+        working-directory: ${{ matrix.directory }}
+        run: rm ${{ env.OUTPUT_TEX }}
+      - name: Cleanup
+        run: rm -rf Eisvogel-2.3.0.zip eisvogel
+      - name: Push changes
+        uses: actions-js/push@master
         with:
-          name: PDF
-          path: ${{ env.WRITEUPS_FOLDER }}/${{ matrix.directory }}/${{ env.OUTPUT_PDF }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          directory: ${{ matrix.directory }}
