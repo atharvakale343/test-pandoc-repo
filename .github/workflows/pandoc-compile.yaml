@@ -1,5 +1,8 @@
 name: Build PDF Document
-on: push
+on:
+  push:
+    paths:
+      - 'writeups'
 
 env:
   INPUT_MD: "submission.md"
@@ -18,7 +21,7 @@ jobs:
           fetch-depth: 0
 
       - name: Find matching workflow
-        uses: SamhammerAG/last-successful-build-action@v2
+        uses: SamhammerAG/last-successful-build-action@v4
         id: last-hash-step
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -43,7 +46,7 @@ jobs:
         run: echo '**Changed Directories**<${{ steps.changed-files.outputs.all_changed_and_modified_files }}>'
       - name: Send output
         id: set-matrix
-        run: echo "::set-output name=matrix::{\"container\":${{ steps.changed-files.outputs.all_changed_and_modified_files }}}"
+        run: echo "matrix={\"container\":${{ steps.changed-files.outputs.all_changed_and_modified_files }}}" >> $GITHUB_OUTPUT
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
 

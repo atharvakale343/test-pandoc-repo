@@ -10,7 +10,7 @@ header-includes:
     - \DefineVerbatimEnvironment{Highlighting}{Verbatim}{breaklines,commandchars=\\\{\}}
 ---
 
-# Checkpoint 1
+# I MADE A CHANGE HERE
 
 ## Contents:
 
