@@ -6,15 +6,44 @@ env:
   OUTPUT_TEX: "submission.tex"
   OUTPUT_PDF_PDFLATEX: "submission.pdf"
   OUTPUT_PDF: "1-checkpoint.pdf"
+  WRITEUPS_FOLDER: "writeups"
 
 jobs:
-  convert_via_pandoc:
+  setup:
     runs-on: ubuntu-latest
     steps:
       - name: Set up Git repository
         uses: actions/checkout@v3
-      - name: Create PDF file
-        run: echo "foo" > main.txt
+      - name: Check Writeup Diffs
+        uses: tj-actions/changed-files@v35
+        id: changed-files
+        with:
+          dir_names: "true"
+          dir_names_exclude_root: "true"
+          files: writeups
+          json: true
+      - name: List all changed files
+        run: echo '**Changed Directories**<${{ steps.changed-files.outputs.all_changed_and_modified_files }}>'
+      - name: Send output
+        id: set-matrix
+        run: echo "::set-output name=matrix::{\"container\":${{ steps.changed-files.outputs.all_changed_and_modified_files }}}"
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+  
+  
+  convert_via_pandoc:
+    needs: [setup]
+    runs-on: ubuntu-latest
+    if: ${{ needs.setup.outputs.matrix != '' && toJson(fromJSON(needs.setup.outputs.matrix).container) != '[]' }}
+    strategy:
+      matrix:
+        directory: ${{ fromJSON(needs.setup.outputs.matrix).container }}
+    steps:
+      - name: Log directory
+        run: |
+          echo "**DOING**: <${{ matrix.directory }}>"
+      - name: Set up Git repository
+        uses: actions/checkout@v3
       - name: Install pandoc template
         run: |
           wget https://github.com/Wandmalfarbe/pandoc-latex-template/releases/download/v2.3.0/Eisvogel-2.3.0.zip
@@ -32,27 +61,18 @@ jobs:
             -V colorlinks=true
             -V linkcolor=blue
             -V urlcolor=blue
-            --output=${{ env.OUTPUT_TEX }}
-            ${{ env.INPUT_MD }}
+            --output=${{ env.WRITEUPS_FOLDER }}/${{ matrix.directory }}/${{ env.OUTPUT_TEX }}
+            ${{ env.WRITEUPS_FOLDER }}/${{ matrix.directory }}/${{ env.INPUT_MD }}
       - name: TEX to PDF file
         uses: xu-cheng/latex-action@v2
         with:
-          root_file: ${{ env.OUTPUT_TEX }}
+          work_in_root_file_dir: true
+          root_file: ${{ env.WRITEUPS_FOLDER }}/${{ matrix.directory }}/${{ env.OUTPUT_TEX }}
           post_compile: "latexmk -c"
       - name: Rename PDF file
-        run: mv ${{ env.OUTPUT_PDF_PDFLATEX }} ${{ env.OUTPUT_PDF }}
+        run: mv ${{ env.WRITEUPS_FOLDER }}/${{ matrix.directory }}/${{ env.OUTPUT_PDF_PDFLATEX }} ${{ env.WRITEUPS_FOLDER }}/${{ matrix.directory }}/${{ env.OUTPUT_PDF }}
       - name: Upload PDF file
         uses: actions/upload-artifact@v3
         with:
           name: PDF
-          path: ${{ env.OUTPUT_PDF }}
-
-      # - name: Compile LaTeX document
-      #   uses: xu-cheng/latex-action@v2
-
-      # - run: echo "foo" > input.txt  # create an example file
-      #   with:
-      #     args: >-  # allows you to break string into multiple lines
-      #       --standalone
-      #       --output=index.html
-      #       input.txt
+          path: ${{ env.WRITEUPS_FOLDER }}/${{ matrix.directory }}/${{ env.OUTPUT_PDF }}
